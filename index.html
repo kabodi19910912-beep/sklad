@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Склад — Распределение отгрузок</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Unbounded:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface2: #eef1f8;
+    --border: #d8dde8;
+    --accent: #2f5be8;
+    --wb: #7c3aed;
+    --wb-light: #6d28d9;
+    --ozon: #005bff;
+    --ozon-light: #0047cc;
+    --text: #1a1f2e;
+    --text2: #6b7488;
+    --green: #16a34a;
+    --red: #dc2626;
+    --yellow: #d97706;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--surface);
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); transition: background 0.3s; }
+  .dot.connected { background: var(--green); }
+
+  .token-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .token-section label { font-size: 11px; color: var(--text2); white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; }
+
+  .token-section input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 14px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .token-section input:focus { border-color: var(--accent); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .btn.green { background: var(--green); }
+  .btn.danger { background: var(--red); }
+
+  .msg { padding: 10px 16px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
+  .msg.error { background: #fef2f2; border: 1px solid #fca5a5; color: var(--red); }
+  .msg.success { background: #f0fdf4; border: 1px solid #86efac; color: var(--green); }
+  .msg.info { background: #eff6ff; border: 1px solid #93c5fd; color: var(--accent); }
+
+  /* PERIOD PICKER */
+  .period-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .period-bar label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+
+  .period-bar input[type="date"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+  }
+  .period-bar input[type="date"]:focus { border-color: var(--accent); }
+
+  .period-shortcuts { display: flex; gap: 6px; }
+  .shortcut {
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+  }
+  .shortcut:hover, .shortcut.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* STOCK PANEL */
+  .stock-panel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+
+  .stock-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  .stock-card .name { font-size: 11px; color: var(--text2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; }
+  .stock-num { font-family: 'Unbounded', sans-serif; font-size: 20px; font-weight: 900; color: var(--text); margin-bottom: 8px; }
+  .stock-sub { display: flex; gap: 10px; font-size: 11px; }
+  .stock-sub span { display: flex; align-items: center; gap: 4px; }
+
+  /* MAIN REPORT TABLE */
+  .section-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  .report-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  thead th {
+    background: var(--surface2);
+    color: var(--text2);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #f8faff; }
+
+  .num { font-weight: 700; }
+  .num.wb { color: var(--wb-light); }
+  .num.ozon { color: var(--ozon-light); }
+  .num.green { color: var(--green); }
+  .num.yellow { color: var(--yellow); }
+  .num.red { color: var(--red); }
+
+  .badge { font-size: 10px; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+  .badge.wb { background: #ede9fe; color: var(--wb-light); border: 1px solid #c4b5fd; }
+  .badge.ozon { background: #dbeafe; color: var(--ozon-light); border: 1px solid #93c5fd; }
+
+  .arrow { color: var(--text2); font-size: 11px; }
+
+  /* INPUT ROW */
+  .income-field {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    width: 90px;
+    outline: none;
+  }
+  .income-field:focus { border-color: var(--accent); }
+
+  /* TAB BAR */
+  .tab-bar { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; width: fit-content; margin-bottom: 20px; }
+  .tab { padding: 7px 18px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text2); transition: all 0.2s; font-family: 'JetBrains Mono', monospace; }
+  .tab.active { background: var(--accent); color: #fff; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+
+  /* HISTORY */
+  .history-week { margin-bottom: 28px; }
+  .history-week-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .week-label { font-family: 'Unbounded', sans-serif; font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 1px; }
+
+  .empty { text-align: center; padding: 40px; color: var(--text2); font-size: 13px; }
+
+  .loading-row td { color: var(--text2); font-size: 12px; font-style: italic; }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">СКЛАД<span>.</span>РУ</div>
+  <div class="status-badge">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Нет подключения</span>
+  </div>
+</header>
+
+<div class="token-section">
+  <label>API Токен</label>
+  <input type="password" id="tokenInput" placeholder="Вставьте токен МойСклад..." />
+  <button class="btn" onclick="connect()">Подключить</button>
+  <button class="btn secondary" onclick="loadAll()">↻ Обновить</button>
+</div>
+
+<div id="msgBox"></div>
+
+<!-- PERIOD -->
+<div class="period-bar">
+  <label>Период отгрузок:</label>
+  <input type="date" id="dateFrom" />
+  <span style="color:var(--text2);font-size:12px;">—</span>
+  <input type="date" id="dateTo" />
+  <div class="period-shortcuts">
+    <div class="shortcut" onclick="setWeek(0)">Эта неделя</div>
+    <div class="shortcut" onclick="setWeek(-1)">Прошлая</div>
+    <div class="shortcut" onclick="setMonth()">Этот месяц</div>
+  </div>
+  <button class="btn" onclick="loadAll()" style="margin-left:auto;">Загрузить</button>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('report')">📊 Отчёт</div>
+  <div class="tab" onclick="switchTab('plan')">📦 Приход</div>
+  <div class="tab" onclick="switchTab('history')">📋 История</div>
+</div>
+
+<!-- TAB: REPORT -->
+<div class="tab-content active" id="tab-report">
+  <div class="section-title">Остатки на складе</div>
+  <div class="stock-panel" id="stockPanel">
+    <div style="grid-column:1/-1;color:var(--text2);font-size:12px;">Подключитесь к МойСклад...</div>
+  </div>
+
+  <div class="section-title">Отгрузки за период</div>
+  <div class="report-wrap">
+    <table id="shipmentsTable">
+      <thead>
+        <tr>
+          <th>Товар</th>
+          <th>Разбивка</th>
+          <th style="color:var(--wb-light)">Отгрузки ВБ</th>
+          <th style="color:var(--ozon-light)">Отгрузки ОЗОН</th>
+          <th>Итого отгружено</th>
+          <th>Ост. ВБ</th>
+          <th>Ост. ОЗОН</th>
+        </tr>
+      </thead>
+      <tbody id="shipmentsBody">
+        <tr class="loading-row"><td colspan="7"><span class="spinner"></span>Ожидание подключения...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB: PLAN (приход) -->
+<div class="tab-content" id="tab-plan">
+  <div class="section-title">Ввод прихода на склад</div>
+  <div class="report-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Товар</th>
+          <th>Разбивка</th>
+          <th>Ост. на складе</th>
+          <th>Приход (шт)</th>
+          <th>Итого</th>
+          <th style="color:var(--wb-light)">→ ВБ</th>
+          <th style="color:var(--ozon-light)">→ ОЗОН</th>
+        </tr>
+      </thead>
+      <tbody id="planBody"></tbody>
+    </table>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
+    <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;">Неделя:</label>
+    <input type="text" id="weekLabel" placeholder="напр. 02.06–08.06.2025" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;width:220px;" />
+    <button class="btn green" onclick="saveWeek()">💾 Сохранить неделю</button>
+    <button class="btn secondary" onclick="clearIncomes()">✕ Очистить</button>
+  </div>
+</div>
+
+<!-- TAB: HISTORY -->
+<div class="tab-content" id="tab-history">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="section-title" style="margin:0;">История приходов по неделям</div>
+    <button class="btn danger" style="font-size:11px;padding:6px 12px;" onclick="clearHistory()">Очистить всё</button>
+  </div>
+  <div id="historyContainer"></div>
+</div>
+
+<script>
+const PRODUCTS = [
+  { id: 'SSChern1',    name: 'ССЧерн-1',    wbPct: 0.50, ozonPct: 0.50 },
+  { id: 'SSChern3',    name: 'ССЧерн-3',    wbPct: 0.45, ozonPct: 0.55 },
+  { id: 'SSChernRoz1', name: 'ССЧернРоз-1', wbPct: 0.50, ozonPct: 0.50 },
+  { id: 'SSPudr1',     name: 'ССПудр-1',    wbPct: 0.50, ozonPct: 0.50 },
+];
+
+const WB_AGENT   = 'ООО РВБ';
+const OZON_AGENT = 'ООО ИНТЕРНЕТ РЕШЕНИЯ';
+
+let token = localStorage.getItem('ms_token') || '';
+let stocks = {};
+let shipments = {}; // { productId: { wb: N, ozon: N } }
+let history = JSON.parse(localStorage.getItem('week_history') || '[]');
+
+// ─── INIT ───────────────────────────────────────────────
+window.onload = () => {
+  setWeek(0);
+  if (token) {
+    document.getElementById('tokenInput').value = token;
+    loadAll(true);
+  }
+  renderPlanTable();
+  renderHistory();
+};
+
+// ─── UTILS ──────────────────────────────────────────────
+function showMsg(text, type = 'error') {
+  const el = document.getElementById('msgBox');
+  el.innerHTML = `<div class="msg ${type}">${text}</div>`;
+  setTimeout(() => el.innerHTML = '', 5000);
+}
+
+function setStatus(ok) {
+  document.getElementById('statusDot').className = 'dot' + (ok ? ' connected' : '');
+  document.getElementById('statusText').textContent = ok ? 'МойСклад подключён' : 'Нет подключения';
+}
+
+function fmt(n) { return (n || 0).toLocaleString('ru'); }
+
+function setWeek(offset) {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const mon = new Date(now); mon.setDate(now.getDate() - day + 1 + offset * 7);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  document.getElementById('dateFrom').value = mon.toISOString().slice(0,10);
+  document.getElementById('dateTo').value   = sun.toISOString().slice(0,10);
+  document.querySelectorAll('.shortcut').forEach((el,i) => el.classList.toggle('active', i === (offset === 0 ? 0 : 1)));
+}
+
+function setMonth() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to   = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  document.getElementById('dateFrom').value = from.toISOString().slice(0,10);
+  document.getElementById('dateTo').value   = to.toISOString().slice(0,10);
+  document.querySelectorAll('.shortcut').forEach((el,i) => el.classList.toggle('active', i === 2));
+}
+
+// ─── API ────────────────────────────────────────────────
+const PROXY = 'https://misty-pine-f8ce.kabodi19910912.workers.dev';
+
+async function msGet(path) {
+  const resp = await fetch(PROXY + path, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.errors?.[0]?.error || `HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+async function connect(silent = false) {
+  const t = document.getElementById('tokenInput').value.trim();
+  if (!t) { showMsg('Введите токен'); return; }
+  token = t;
+  localStorage.setItem('ms_token', token);
+  await loadAll(silent);
+}
+
+async function loadAll(silent = false) {
+  if (!token) return;
+  showMsg('<span class="spinner"></span>Загрузка данных...', 'info');
+  try {
+    await Promise.all([loadStocks(), loadShipments()]);
+    setStatus(true);
+    if (!silent) showMsg('Данные загружены', 'success');
+    else document.getElementById('msgBox').innerHTML = '';
+    renderPlanTable();
+    renderShipmentsTable();
+  } catch(e) {
+    showMsg('Ошибка: ' + e.message);
+    setStatus(false);
+  }
+}
+
+// ОСТАТКИ
+async function loadStocks() {
+  const data = await msGet('/report/stock/all?groupBy=product&limit=1000');
+  stocks = {};
+  PRODUCTS.forEach(p => {
+    const row = data.rows?.find(r => r.name === p.name);
+    stocks[p.id] = row ? Math.round(row.stock || 0) : 0;
+  });
+  renderStockPanel();
+}
+
+// ОТГРУЗКИ
+async function loadShipments() {
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  if (!from || !to) return;
+
+  // Загружаем отгрузки за период
+  const fromDt = from + ' 00:00:00';
+  const toDt   = to   + ' 23:59:59';
+
+  const data = await msGet(
+    `/entity/demand?filter=moment>=${encodeURIComponent(fromDt)};moment<=${encodeURIComponent(toDt)}&expand=positions.assortment,agent&limit=200`
+  );
+
+  shipments = {};
+  PRODUCTS.forEach(p => { shipments[p.id] = { wb: 0, ozon: 0 }; });
+
+  for (const demand of (data.rows || [])) {
+    const agentName = demand.agent?.name || '';
+    const isWB   = agentName.toUpperCase().includes('РВБ') || agentName.toUpperCase().includes('RVB');
+    const isOzon = agentName.toUpperCase().includes('ИНТЕРНЕТ') || agentName.toUpperCase().includes('OZON');
+    if (!isWB && !isOzon) continue;
+
+    for (const pos of (demand.positions?.rows || [])) {
+      const prodName = pos.assortment?.name || '';
+      const p = PRODUCTS.find(x => prodName.includes(x.name));
+      if (!p) continue;
+      const qty = pos.quantity || 0;
+      if (isWB)   shipments[p.id].wb   += qty;
+      if (isOzon) shipments[p.id].ozon += qty;
+    }
+  }
+}
+
+// ─── RENDER ─────────────────────────────────────────────
+function renderStockPanel() {
+  document.getElementById('stockPanel').innerHTML = PRODUCTS.map(p => {
+    const total = stocks[p.id] || 0;
+    const wb   = Math.round(total * p.wbPct);
+    const ozon = total - wb;
+    return `
+      <div class="stock-card">
+        <div class="name">${p.name}</div>
+        <div class="stock-num">${fmt(total)}</div>
+        <div class="stock-sub">
+          <span><span class="badge wb">ВБ</span> <b style="color:var(--wb-light)">${fmt(wb)}</b></span>
+          <span><span class="badge ozon">ОЗ</span> <b style="color:var(--ozon-light)">${fmt(ozon)}</b></span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderShipmentsTable() {
+  document.getElementById('shipmentsBody').innerHTML = PRODUCTS.map(p => {
+    const stock = stocks[p.id] || 0;
+    const sh    = shipments[p.id] || { wb: 0, ozon: 0 };
+    const totalSh = sh.wb + sh.ozon;
+
+    // Остатки = склад - отгружено (по каналам)
+    const remWb   = Math.round(stock * p.wbPct)   - sh.wb;
+    const remOzon = Math.round(stock * p.ozonPct) - sh.ozon;
+
+    const remWbClass   = remWb   < 0 ? 'red' : remWb   < 100 ? 'yellow' : 'green';
+    const remOzonClass = remOzon < 0 ? 'red' : remOzon < 100 ? 'yellow' : 'green';
+
+    return `
+      <tr>
+        <td><b>${p.name}</b></td>
+        <td>
+          <span class="badge wb">ВБ ${Math.round(p.wbPct*100)}%</span>
+          <span class="badge ozon" style="margin-left:4px;">ОЗ ${Math.round(p.ozonPct*100)}%</span>
+        </td>
+        <td class="num wb">${fmt(sh.wb)}</td>
+        <td class="num ozon">${fmt(sh.ozon)}</td>
+        <td class="num">${fmt(totalSh)}</td>
+        <td class="num ${remWbClass}">${fmt(remWb)}</td>
+        <td class="num ${remOzonClass}">${fmt(remOzon)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderPlanTable() {
+  document.getElementById('planBody').innerHTML = PRODUCTS.map(p => {
+    const stock = stocks[p.id] || 0;
+    return `
+      <tr>
+        <td><b>${p.name}</b></td>
+        <td>
+          <span class="badge wb">ВБ ${Math.round(p.wbPct*100)}%</span>
+          <span class="badge ozon" style="margin-left:4px;">ОЗ ${Math.round(p.ozonPct*100)}%</span>
+        </td>
+        <td class="num">${fmt(stock)}</td>
+        <td><input class="income-field" type="number" id="inc-${p.id}" value="0" min="0" oninput="recalcPlan('${p.id}')" /></td>
+        <td class="num" id="ptotal-${p.id}">—</td>
+        <td class="num wb" id="pwb-${p.id}">—</td>
+        <td class="num ozon" id="poz-${p.id}">—</td>
+      </tr>`;
+  }).join('');
+  PRODUCTS.forEach(p => recalcPlan(p.id));
+}
+
+function recalcPlan(id) {
+  const p = PRODUCTS.find(x => x.id === id);
+  const stock  = stocks[p.id] || 0;
+  const income = parseInt(document.getElementById('inc-'+id)?.value || 0) || 0;
+  const total  = stock + income;
+  const wb     = Math.round(total * p.wbPct);
+  const ozon   = total - wb;
+  const set = (el, v) => { const e = document.getElementById(el); if(e) e.textContent = v; };
+  set('ptotal-'+id, fmt(total));
+  set('pwb-'+id,    fmt(wb));
+  set('poz-'+id,    fmt(ozon));
+}
+
+function clearIncomes() {
+  PRODUCTS.forEach(p => { const el = document.getElementById('inc-'+p.id); if(el) el.value = 0; recalcPlan(p.id); });
+}
+
+function saveWeek() {
+  const label = document.getElementById('weekLabel').value.trim() || new Date().toLocaleDateString('ru');
+  const rows = PRODUCTS.map(p => {
+    const stock  = stocks[p.id] || 0;
+    const income = parseInt(document.getElementById('inc-'+p.id)?.value || 0) || 0;
+    const total  = stock + income;
+    const wb     = Math.round(total * p.wbPct);
+    const ozon   = total - wb;
+    return { id: p.id, name: p.name, stock, income, total, wb, ozon, wbPct: p.wbPct, ozonPct: p.ozonPct };
+  });
+  history.unshift({ week: label, date: new Date().toISOString(), rows });
+  localStorage.setItem('week_history', JSON.stringify(history));
+  showMsg(`Неделя "${label}" сохранена`, 'success');
+  renderHistory();
+  switchTab('history');
+}
+
+function renderHistory() {
+  const c = document.getElementById('historyContainer');
+  if (!history.length) { c.innerHTML = '<div class="empty">Нет сохранённых недель.</div>'; return; }
+  c.innerHTML = history.map((w, wi) => `
+    <div class="history-week">
+      <div class="history-week-title">
+        <div class="week-label">📅 ${w.week}</div>
+        <button class="btn danger" style="font-size:10px;padding:5px 10px;" onclick="deleteWeek(${wi})">Удалить</button>
+      </div>
+      <div class="report-wrap">
+        <table>
+          <thead><tr>
+            <th>Товар</th><th>Разбивка</th>
+            <th>Ост. до</th><th>Приход</th><th>Итого</th>
+            <th style="color:var(--wb-light)">→ ВБ</th>
+            <th style="color:var(--ozon-light)">→ ОЗОН</th>
+          </tr></thead>
+          <tbody>
+            ${w.rows.map(r => `
+              <tr>
+                <td><b>${r.name}</b></td>
+                <td>
+                  <span class="badge wb">ВБ ${Math.round(r.wbPct*100)}%</span>
+                  <span class="badge ozon" style="margin-left:4px;">ОЗ ${Math.round(r.ozonPct*100)}%</span>
+                </td>
+                <td class="num">${fmt(r.stock)}</td>
+                <td class="num green">+${fmt(r.income)}</td>
+                <td class="num">${fmt(r.total)}</td>
+                <td class="num wb">${fmt(r.wb)}</td>
+                <td class="num ozon">${fmt(r.ozon)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`).join('');
+}
+
+function deleteWeek(i) {
+  if (!confirm('Удалить эту неделю?')) return;
+  history.splice(i, 1);
+  localStorage.setItem('week_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function clearHistory() {
+  if (!confirm('Очистить всю историю?')) return;
+  history = [];
+  localStorage.setItem('week_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function switchTab(tab) {
+  ['report','plan','history'].forEach((t,i) => {
+    document.querySelectorAll('.tab')[i].classList.toggle('active', t === tab);
+    document.getElementById('tab-'+t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'plan') renderPlanTable();
+}
+</script>
+</body>
+</html>
